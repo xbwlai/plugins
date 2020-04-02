@@ -1,3 +1,7 @@
+## 0.10.9
+
+* Add caching functionality to videos from network sources.
+
 ## 0.10.8+2
 
 * Replace deprecated `getFlutterEngine` call on Android.
@@ -10,7 +14,6 @@
 
 * Added support for cleaning up the plugin if used for add-to-app (Flutter
   v1.15.3 is required for that feature).
-
 
 ## 0.10.7
 

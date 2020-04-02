@@ -5,6 +5,7 @@
 #import "FLTVideoPlayerPlugin.h"
 #import <AVFoundation/AVFoundation.h>
 #import <GLKit/GLKit.h>
+#import "VIMediaCache.h"
 
 #if !__has_feature(objc_arc)
 #error Code Requires ARC.
@@ -50,6 +51,7 @@ int64_t FLTCMTimeToMillis(CMTime time) {
 - (void)pause;
 - (void)setIsLooping:(bool)isLooping;
 - (void)updatePlayingState;
++ (VIResourceLoaderManager*)resourceLoaderManager;
 @end
 
 static void* timeRangeContext = &timeRangeContext;
@@ -162,8 +164,27 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
 }
 
 - (instancetype)initWithURL:(NSURL*)url frameUpdater:(FLTFrameUpdater*)frameUpdater {
-  AVPlayerItem* item = [AVPlayerItem playerItemWithURL:url];
+  return [self initWithURL:url frameUpdater:frameUpdater enableCache:NO];
+}
+
+- (instancetype)initWithURL:(NSURL*)url
+               frameUpdater:(FLTFrameUpdater*)frameUpdater
+                enableCache:(BOOL)enableCache {
+  AVPlayerItem* item;
+  if (enableCache) {
+    item = [[FLTVideoPlayer resourceLoaderManager] playerItemWithURL:url];
+  } else {
+    item = [AVPlayerItem playerItemWithURL:url];
+  }
   return [self initWithPlayerItem:item frameUpdater:frameUpdater];
+}
+
++ (VIResourceLoaderManager*)resourceLoaderManager {
+  static VIResourceLoaderManager* resourceLoaderManager = nil;
+  if (resourceLoaderManager == nil) {
+    resourceLoaderManager = [VIResourceLoaderManager new];
+  }
+  return resourceLoaderManager;
 }
 
 - (CGAffineTransform)fixTransform:(AVAssetTrack*)videoTrack {
@@ -425,6 +446,8 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
 @property(readonly, weak, nonatomic) NSObject<FlutterBinaryMessenger>* messenger;
 @property(readonly, strong, nonatomic) NSMutableDictionary* players;
 @property(readonly, strong, nonatomic) NSObject<FlutterPluginRegistrar>* registrar;
+@property(readonly, nonatomic) long maxCacheSize;
+@property(readonly, nonatomic) long maxCacheFileSize;
 @end
 
 @implementation FLTVideoPlayerPlugin
@@ -480,6 +503,9 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
       [_players[textureId] dispose];
     }
     [_players removeAllObjects];
+    NSDictionary* argsMap = call.arguments;
+    _maxCacheSize = ((NSNumber*)argsMap[@"maxCacheSize"]).longValue;
+    _maxCacheFileSize = ((NSNumber*)argsMap[@"maxCacheFileSize"]).longValue;
     result(nil);
   } else if ([@"create" isEqualToString:call.method]) {
     NSDictionary* argsMap = call.arguments;
@@ -498,8 +524,20 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
       player = [[FLTVideoPlayer alloc] initWithAsset:assetPath frameUpdater:frameUpdater];
       [self onPlayerSetup:player frameUpdater:frameUpdater result:result];
     } else if (uriArg) {
-      player = [[FLTVideoPlayer alloc] initWithURL:[NSURL URLWithString:uriArg]
-                                      frameUpdater:frameUpdater];
+      BOOL useCache = [argsMap[@"useCache"] boolValue];
+      BOOL enableCache = _maxCacheSize > 0 && _maxCacheFileSize > 0 && useCache;
+      if (enableCache) {
+        NSString* escapedURL = [uriArg
+            stringByAddingPercentEncodingWithAllowedCharacters:NSMutableCharacterSet
+                                                                   .alphanumericCharacterSet];
+        player = [[FLTVideoPlayer alloc] initWithURL:[NSURL URLWithString:escapedURL]
+                                        frameUpdater:frameUpdater
+                                         enableCache:enableCache];
+      } else {
+        player = [[FLTVideoPlayer alloc] initWithURL:[NSURL URLWithString:uriArg]
+                                        frameUpdater:frameUpdater];
+      }
+
       [self onPlayerSetup:player frameUpdater:frameUpdater result:result];
     } else {
       result(FlutterMethodNotImplemented);

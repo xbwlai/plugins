@@ -17,11 +17,6 @@ export 'package:video_player_platform_interface/video_player_platform_interface.
 import 'src/closed_caption_file.dart';
 export 'src/closed_caption_file.dart';
 
-final VideoPlayerPlatform _videoPlayerPlatform = VideoPlayerPlatform.instance
-  // This will clear all open videos on the platform when a full restart is
-  // performed.
-  ..init();
-
 /// The duration, current position, buffering state, error state and settings
 /// of a [VideoPlayerController].
 class VideoPlayerValue {
@@ -171,6 +166,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
       {this.package, this.closedCaptionFile})
       : dataSourceType = DataSourceType.asset,
         formatHint = null,
+        useCache = false,
         super(VideoPlayerValue(duration: null));
 
   /// Constructs a [VideoPlayerController] playing a video from obtained from
@@ -179,11 +175,17 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   /// The URI for the video is given by the [dataSource] argument and must not be
   /// null.
   /// **Android only**: The [formatHint] option allows the caller to override
-  /// the video format detection code.
-  VideoPlayerController.network(this.dataSource,
-      {this.formatHint, this.closedCaptionFile})
-      : dataSourceType = DataSourceType.network,
+  /// the video format detection code. The [useCache] argument must be non-null,
+  /// default is false.
+  VideoPlayerController.network(
+    this.dataSource, {
+    this.formatHint,
+    this.closedCaptionFile,
+    bool useCache = false,
+  })  : assert(useCache != null),
+        dataSourceType = DataSourceType.network,
         package = null,
+        useCache = useCache,
         super(VideoPlayerValue(duration: null));
 
   /// Constructs a [VideoPlayerController] playing a video from a file.
@@ -195,7 +197,14 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
         dataSourceType = DataSourceType.file,
         package = null,
         formatHint = null,
+        useCache = false,
         super(VideoPlayerValue(duration: null));
+
+  /// The maximum cache size to keep on disk in bytes.
+  static int _maxCacheSize = 100 * 1024 * 1024;
+
+  /// The maximum size of each individual file in bytes.
+  static int _maxCacheFileSize = 10 * 1024 * 1024;
 
   int _textureId;
 
@@ -211,6 +220,9 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   /// is constructed with.
   final DataSourceType dataSourceType;
 
+  /// Use cache for this data source or not. Used only for network data source.
+  final bool useCache;
+
   /// Only set for [asset] videos. The package that the asset was loaded from.
   final String package;
 
@@ -224,6 +236,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   ClosedCaptionFile _closedCaptionFile;
   Timer _timer;
   bool _isDisposed = false;
+  static Completer<void> _pluginInitializingCompleter;
   Completer<void> _creatingCompleter;
   StreamSubscription<dynamic> _eventSubscription;
   _VideoAppLifeCycleObserver _lifeCycleObserver;
@@ -233,8 +246,30 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   @visibleForTesting
   int get textureId => _textureId;
 
+  /// Set the cache size in bytes. Default is maxSize of `100 * 1024 * 1024`
+  /// and maxFileSize of `10 * 1024 * 1024`.
+  ///
+  /// Cache used only for network data source.
+  ///
+  /// Throws StateError if you try to set the cache size twice. You can only set it once.
+  static void setCacheSize(int maxSize, int maxFileSize) {
+    assert(maxSize != null && maxSize > 0);
+    assert(maxFileSize != null && maxFileSize > 0);
+
+    if (_pluginInitializingCompleter != null) {
+      throw StateError(
+        "You can only set the VideoPlayerController cache size once.",
+      );
+    }
+
+    _maxCacheSize = maxSize;
+    _maxCacheFileSize = maxFileSize;
+  }
+
   /// Attempts to open the given [dataSource] and load metadata about the video.
   Future<void> initialize() async {
+    await _ensureVideoPluginInitialized();
+
     _lifeCycleObserver = _VideoAppLifeCycleObserver(this);
     _lifeCycleObserver.initialize();
     _creatingCompleter = Completer<void>();
@@ -253,6 +288,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
           sourceType: DataSourceType.network,
           uri: dataSource,
           formatHint: formatHint,
+          useCache: useCache,
         );
         break;
       case DataSourceType.file:
@@ -262,7 +298,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
         );
         break;
     }
-    _textureId = await _videoPlayerPlatform.create(dataSourceDescription);
+    _textureId = await VideoPlayerPlatform.instance.create(dataSourceDescription);
     _creatingCompleter.complete(null);
     final Completer<void> initializingCompleter = Completer<void>();
 
@@ -316,10 +352,23 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
       }
     }
 
-    _eventSubscription = _videoPlayerPlatform
+    _eventSubscription = VideoPlayerPlatform.instance
         .videoEventsFor(_textureId)
         .listen(eventListener, onError: errorListener);
     return initializingCompleter.future;
+  }
+
+  Future<void> _ensureVideoPluginInitialized() async {
+    if (_pluginInitializingCompleter != null) {
+      return _pluginInitializingCompleter.future;
+    }
+
+    _pluginInitializingCompleter = Completer();
+
+    await VideoPlayerPlatform.instance.init(_maxCacheSize, _maxCacheFileSize);
+    _pluginInitializingCompleter.complete(null);
+
+    return _pluginInitializingCompleter.future;
   }
 
   @override
@@ -330,7 +379,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
         _isDisposed = true;
         _timer?.cancel();
         await _eventSubscription?.cancel();
-        await _videoPlayerPlatform.dispose(_textureId);
+        await VideoPlayerPlatform.instance.dispose(_textureId);
       }
       _lifeCycleObserver.dispose();
     }
@@ -365,7 +414,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     if (!value.initialized || _isDisposed) {
       return;
     }
-    await _videoPlayerPlatform.setLooping(_textureId, value.isLooping);
+    await VideoPlayerPlatform.instance.setLooping(_textureId, value.isLooping);
   }
 
   Future<void> _applyPlayPause() async {
@@ -373,7 +422,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
       return;
     }
     if (value.isPlaying) {
-      await _videoPlayerPlatform.play(_textureId);
+      await VideoPlayerPlatform.instance.play(_textureId);
       _timer = Timer.periodic(
         const Duration(milliseconds: 500),
         (Timer timer) async {
@@ -389,7 +438,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
       );
     } else {
       _timer?.cancel();
-      await _videoPlayerPlatform.pause(_textureId);
+      await VideoPlayerPlatform.instance.pause(_textureId);
     }
   }
 
@@ -397,7 +446,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     if (!value.initialized || _isDisposed) {
       return;
     }
-    await _videoPlayerPlatform.setVolume(_textureId, value.volume);
+    await VideoPlayerPlatform.instance.setVolume(_textureId, value.volume);
   }
 
   /// The position in the current video.
@@ -405,7 +454,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     if (_isDisposed) {
       return null;
     }
-    return await _videoPlayerPlatform.getPosition(_textureId);
+    return await VideoPlayerPlatform.instance.getPosition(_textureId);
   }
 
   /// Sets the video's current timestamp to be at [moment]. The next
@@ -422,7 +471,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     } else if (position < const Duration()) {
       position = const Duration();
     }
-    await _videoPlayerPlatform.seekTo(_textureId, position);
+    await VideoPlayerPlatform.instance.seekTo(_textureId, position);
     _updatePosition(position);
   }
 
@@ -549,7 +598,7 @@ class _VideoPlayerState extends State<VideoPlayer> {
   Widget build(BuildContext context) {
     return _textureId == null
         ? Container()
-        : _videoPlayerPlatform.buildView(_textureId);
+        : VideoPlayerPlatform.instance.buildView(_textureId);
   }
 }
 

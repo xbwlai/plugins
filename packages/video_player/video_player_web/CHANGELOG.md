@@ -1,3 +1,7 @@
+## 0.1.2+2
+
+- bump video_player_platform_interface to 1.0.1
+
 ## 0.1.2+1
 
 * Make the pedantic dev_dependency explicit.
