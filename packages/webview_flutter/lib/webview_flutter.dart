@@ -142,6 +142,10 @@ typedef void PageStartedCallback(String url);
 /// Signature for when a [WebView] has finished loading a page.
 typedef void PageFinishedCallback(String url);
 
+/// Signature for when a [WebView] has finished loading a page.
+///
+typedef void ProgressChangedCallback(double progress);
+
 /// Signature for when a [WebView] has failed to load a resource.
 typedef void WebResourceErrorCallback(WebResourceError error);
 
@@ -201,6 +205,7 @@ class JavascriptChannel {
 /// the `WebView` is not able to block the `WebView` from receiving touch events.
 /// See https://github.com/flutter/flutter/issues/53490.
 class WebView extends StatefulWidget {
+
   /// Creates a new web view.
   ///
   /// The web view can be controlled using a `WebViewController` that is passed to the
@@ -217,6 +222,7 @@ class WebView extends StatefulWidget {
     this.gestureRecognizers,
     this.onPageStarted,
     this.onPageFinished,
+    this.onProgressChanged,
     this.onWebResourceError,
     this.debuggingEnabled = false,
     this.gestureNavigationEnabled = false,
@@ -353,6 +359,9 @@ class WebView extends StatefulWidget {
   /// This can be called for any resource (iframe, image, etc.), not just for
   /// the main page.
   final WebResourceErrorCallback onWebResourceError;
+
+  /// Invoked when the load progress changes
+  final ProgressChangedCallback onProgressChanged;
 
   /// Controls whether WebView debugging is enabled.
   ///
@@ -547,6 +556,13 @@ class _PlatformCallbacksHandler implements WebViewPlatformCallbacksHandler {
   void onPageStarted(String url) {
     if (_widget.onPageStarted != null) {
       _widget.onPageStarted(url);
+    }
+  }
+
+  @override
+  void onProgressChanged(double progress) {
+    if (_widget.onProgressChanged != null) {
+      _widget.onProgressChanged(progress);
     }
   }
 
