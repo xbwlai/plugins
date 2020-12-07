@@ -99,6 +99,9 @@
     [_channel setMethodCallHandler:^(FlutterMethodCall* call, FlutterResult result) {
       [weakSelf onMethodCall:call result:result];
     }];
+    
+    // 添加加载进度监听
+    [_webView addObserver:self forKeyPath:@"estimatedProgress" options:NSKeyValueObservingOptionNew context:NULL];
 
     if (@available(iOS 11.0, *)) {
       _webView.scrollView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
@@ -435,6 +438,26 @@
   } else {
     NSLog(@"Updating UserAgent is not supported for Flutter WebViews prior to iOS 9.");
   }
+}
+
+// 加载进度监听
+- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
+    if ([keyPath isEqualToString:@"estimatedProgress"] && object == _webView) {
+        [_channel invokeMethod:@"onProgressChanged" arguments:@{@"progress": @(_webView.estimatedProgress)}];
+    } else {
+        [super observeValueForKeyPath:keyPath ofObject:object change:change context:context];
+    }
+}
+
+// 移除加载进度监听
+- (void)dealloc {
+    if (_webView != nil) {
+        [_webView stopLoading];
+        [_webView removeFromSuperview];
+        _webView.navigationDelegate = nil;
+        [_webView removeObserver:self forKeyPath:@"estimatedProgress"];
+        _webView = nil;
+    }
 }
 
 #pragma mark WKUIDelegate
