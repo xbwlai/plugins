@@ -22,7 +22,6 @@
   } else {
     result(FlutterMethodNotImplemented);
   }
-    
 }
 
 - (void)clearCookies:(FlutterResult)result {

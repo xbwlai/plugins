@@ -142,12 +142,11 @@ typedef void PageStartedCallback(String url);
 /// Signature for when a [WebView] has finished loading a page.
 typedef void PageFinishedCallback(String url);
 
-/// Signature for when a [WebView] has finished loading a page.
-///
-typedef void ProgressChangedCallback(double progress);
-
 /// Signature for when a [WebView] has failed to load a resource.
 typedef void WebResourceErrorCallback(WebResourceError error);
+
+/// Signature for when a [WebView] has load progress changes.
+typedef void ProgressChangedCallback(double progress);
 
 /// Specifies possible restrictions on automatic media playback.
 ///
