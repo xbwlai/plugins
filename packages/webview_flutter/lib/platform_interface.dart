@@ -30,6 +30,7 @@ abstract class WebViewPlatformCallbacksHandler {
   void onPageFinished(String url);
 
   /// Invoked by [WebViewPlatformController] when the load progress changes.
+  /// [progress] range [0,1]
   void onProgressChanged(double progress);
 
   /// Report web resource loading error to the host application.

@@ -83,6 +83,9 @@ class _WebViewExampleState extends State<WebViewExample> {
             print('Page finished loading: $url');
           },
           gestureNavigationEnabled: true,
+          onProgressChanged: (progress) {
+            print('Page loading progress: $progress');
+          },
         );
       }),
       floatingActionButton: favoriteButton(),
