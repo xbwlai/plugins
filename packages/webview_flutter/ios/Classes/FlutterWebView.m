@@ -100,7 +100,7 @@
       [weakSelf onMethodCall:call result:result];
     }];
     
-    //添加加载进度监听
+    // 添加加载进度监听
     [_webView addObserver:self forKeyPath:@"estimatedProgress" options:NSKeyValueObservingOptionNew context:NULL];
 
     if (@available(iOS 11.0, *)) {
@@ -440,7 +440,7 @@
   }
 }
 
-//加载进度监听
+// 加载进度监听
 - (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
     if ([keyPath isEqualToString:@"estimatedProgress"] && object == _webView) {
         [_channel invokeMethod:@"onProgressChanged" arguments:@{@"progress": @(_webView.estimatedProgress)}];
@@ -449,7 +449,7 @@
     }
 }
 
-//移除加载进度监听
+// 移除加载进度监听
 - (void)dealloc {
     if (_webView != nil) {
         [_webView stopLoading];
