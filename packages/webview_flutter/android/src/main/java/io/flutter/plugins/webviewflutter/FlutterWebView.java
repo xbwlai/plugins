@@ -24,6 +24,7 @@ import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
 import io.flutter.plugin.common.MethodChannel.Result;
 import io.flutter.plugin.platform.PlatformView;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -36,6 +37,12 @@ public class FlutterWebView implements PlatformView, MethodCallHandler {
 
   // Verifies that a url opened by `Window.open` has a secure url.
   private class FlutterWebChromeClient extends WebChromeClient {
+    private final MethodChannel methodChannel;
+
+    FlutterWebChromeClient(MethodChannel methodChannel) {
+      this.methodChannel = methodChannel;
+    }
+
     @Override
     public boolean onCreateWindow(
         final WebView view, boolean isDialog, boolean isUserGesture, Message resultMsg) {
@@ -72,11 +79,17 @@ public class FlutterWebView implements PlatformView, MethodCallHandler {
 
       return true;
     }
+
+    @Override
+    public void onProgressChanged(WebView view, int newProgress) {
+      Map<String, Object> args = new HashMap<>();
+      args.put("progress", newProgress / 100d);
+      methodChannel.invokeMethod("onProgressChanged", args);
+    }
   }
 
   @TargetApi(Build.VERSION_CODES.JELLY_BEAN_MR1)
-  @SuppressWarnings("unchecked")
-  FlutterWebView(
+  @SuppressWarnings("unchecked") FlutterWebView(
       final Context context,
       BinaryMessenger messenger,
       int id,
@@ -97,11 +110,11 @@ public class FlutterWebView implements PlatformView, MethodCallHandler {
 
     // Multi windows is set with FlutterWebChromeClient by default to handle internal bug: b/159892679.
     webView.getSettings().setSupportMultipleWindows(true);
-    webView.setWebChromeClient(new FlutterWebChromeClient());
 
     methodChannel = new MethodChannel(messenger, "plugins.flutter.io/webview_" + id);
     methodChannel.setMethodCallHandler(this);
 
+    webView.setWebChromeClient(new FlutterWebChromeClient(methodChannel));
     flutterWebViewClient = new FlutterWebViewClient(methodChannel);
     Map<String, Object> settings = (Map<String, Object>) params.get("settings");
     if (settings != null) applySettings(settings);
