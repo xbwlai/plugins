@@ -70,6 +70,7 @@ public class VideoPlayerPlugin implements MethodCallHandler, FlutterPlugin {
     }
     flutterState.stopListening();
     flutterState = null;
+    disposeAllPlayers();
   }
 
   private void disposeAllPlayers() {
