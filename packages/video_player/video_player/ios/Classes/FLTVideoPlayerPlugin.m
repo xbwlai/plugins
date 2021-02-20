@@ -6,6 +6,7 @@
 #import <AVFoundation/AVFoundation.h>
 #import <GLKit/GLKit.h>
 #import "messages.h"
+#import "VIMediaCache.h"
 
 #if !__has_feature(objc_arc)
 #error Code Requires ARC.
@@ -51,6 +52,7 @@ int64_t FLTCMTimeToMillis(CMTime time) {
 - (void)pause;
 - (void)setIsLooping:(bool)isLooping;
 - (void)updatePlayingState;
++ (VIResourceLoaderManager*)resourceLoaderManager;
 @end
 
 static void* timeRangeContext = &timeRangeContext;
@@ -163,8 +165,27 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
 }
 
 - (instancetype)initWithURL:(NSURL*)url frameUpdater:(FLTFrameUpdater*)frameUpdater {
-  AVPlayerItem* item = [AVPlayerItem playerItemWithURL:url];
+  return [self initWithURL:url frameUpdater:frameUpdater enableCache:NO];
+}
+
+- (instancetype)initWithURL:(NSURL*)url
+               frameUpdater:(FLTFrameUpdater*)frameUpdater
+                enableCache:(BOOL)enableCache {
+  AVPlayerItem* item;
+  if (enableCache) {
+    item = [[FLTVideoPlayer resourceLoaderManager] playerItemWithURL:url];
+  } else {
+    item = [AVPlayerItem playerItemWithURL:url];
+  }
   return [self initWithPlayerItem:item frameUpdater:frameUpdater];
+}
+
++ (VIResourceLoaderManager*)resourceLoaderManager {
+  static VIResourceLoaderManager* resourceLoaderManager = nil;
+  if (resourceLoaderManager == nil) {
+    resourceLoaderManager = [VIResourceLoaderManager new];
+  }
+  return resourceLoaderManager;
 }
 
 - (CGAffineTransform)fixTransform:(AVAssetTrack*)videoTrack {

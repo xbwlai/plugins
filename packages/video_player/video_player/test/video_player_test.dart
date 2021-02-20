@@ -69,6 +69,9 @@ class FakeController extends ValueNotifier<VideoPlayerValue>
 
   @override
   VideoPlayerOptions get videoPlayerOptions => null;
+
+  @override
+  bool get useCache => false;
 }
 
 Future<ClosedCaptionFile> _loadClosedCaption() async =>
@@ -680,7 +683,7 @@ class FakeVideoPlayerPlatform extends TestHostVideoPlayerApi {
   }
 
   @override
-  void initialize() {
+  void initialize(InitializeMessage arg) {
     calls.add('init');
     initialized.complete(true);
   }

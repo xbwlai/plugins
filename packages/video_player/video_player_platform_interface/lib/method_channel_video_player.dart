@@ -16,8 +16,10 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
   VideoPlayerApi _api = VideoPlayerApi();
 
   @override
-  Future<void> init() {
-    return _api.initialize();
+  Future<void> init(int maxCacheSize, int maxCacheFileSize) {
+    return _api.initialize(InitializeMessage()
+      ..maxCacheSize = maxCacheSize
+      ..maxCacheFileSize = maxCacheFileSize);
   }
 
   @override
@@ -42,6 +44,7 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
         message.uri = dataSource.uri;
         break;
     }
+    message.useCache = dataSource.useCache;
 
     TextureMessage response = await _api.create(message);
     return response.textureId;

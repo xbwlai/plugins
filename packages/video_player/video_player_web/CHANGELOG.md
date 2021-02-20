@@ -1,31 +1,6 @@
-## 0.1.4+1
-
-* Substitute `undefined_prefixed_name: ignore` analyzer setting by a `dart:ui` shim with conditional exports. [Issue](https://github.com/flutter/flutter/issues/69309).
-
-## 0.1.4
-
-* Added option to set the video playback speed on the video controller.
-
-## 0.1.3+2
-
-* Allow users to set the 'muted' attribute on video elements by setting their volume to 0.
-* Do not parse URIs on 'network' videos to not break blobs (Safari).
-
-## 0.1.3+1
-
-* Remove Android folder from `video_player_web`.
-
-## 0.1.3
-
-* Updated video_player_platform_interface, bumped minimum Dart version to 2.1.0.
-
-## 0.1.2+3
-
-* Declare API stability and compatibility with `1.0.0` (more details at: https://github.com/flutter/flutter/wiki/Package-migration-to-1.0.0).
-
 ## 0.1.2+2
 
-* Add `analysis_options.yaml` to the package, so we can ignore `undefined_prefixed_name` errors. Works around https://github.com/flutter/flutter/issues/41563.
+- bump video_player_platform_interface to 1.0.1
 
 ## 0.1.2+1
 

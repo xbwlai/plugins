@@ -1,9 +1,7 @@
 package io.flutter.plugins.videoplayer;
 
-import static com.google.android.exoplayer2.Player.REPEAT_MODE_ALL;
-import static com.google.android.exoplayer2.Player.REPEAT_MODE_OFF;
-
 import android.content.Context;
+import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
 import android.os.Build;
 import android.view.Surface;
@@ -16,6 +14,7 @@ import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.Player.EventListener;
 import com.google.android.exoplayer2.SimpleExoPlayer;
 import com.google.android.exoplayer2.audio.AudioAttributes;
+import com.google.android.exoplayer2.database.DatabaseProvider;
 import com.google.android.exoplayer2.source.MediaSource;
 import com.google.android.exoplayer2.source.ProgressiveMediaSource;
 import com.google.android.exoplayer2.source.dash.DashMediaSource;
@@ -24,17 +23,27 @@ import com.google.android.exoplayer2.source.hls.HlsMediaSource;
 import com.google.android.exoplayer2.source.smoothstreaming.DefaultSsChunkSource;
 import com.google.android.exoplayer2.source.smoothstreaming.SsMediaSource;
 import com.google.android.exoplayer2.upstream.DataSource;
+import com.google.android.exoplayer2.upstream.DefaultBandwidthMeter;
 import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
 import com.google.android.exoplayer2.upstream.DefaultHttpDataSource;
 import com.google.android.exoplayer2.upstream.DefaultHttpDataSourceFactory;
+import com.google.android.exoplayer2.upstream.FileDataSource;
+import com.google.android.exoplayer2.upstream.cache.CacheDataSink;
+import com.google.android.exoplayer2.upstream.cache.CacheDataSource;
+import com.google.android.exoplayer2.upstream.cache.LeastRecentlyUsedCacheEvictor;
+import com.google.android.exoplayer2.upstream.cache.SimpleCache;
 import com.google.android.exoplayer2.util.Util;
 import io.flutter.plugin.common.EventChannel;
 import io.flutter.view.TextureRegistry;
+import java.io.File;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import static com.google.android.exoplayer2.Player.REPEAT_MODE_ALL;
+import static com.google.android.exoplayer2.Player.REPEAT_MODE_OFF;
 
 final class VideoPlayer {
   private static final String FORMAT_SS = "ss";
@@ -42,13 +51,13 @@ final class VideoPlayer {
   private static final String FORMAT_HLS = "hls";
   private static final String FORMAT_OTHER = "other";
 
-  private SimpleExoPlayer exoPlayer;
+  private final SimpleExoPlayer exoPlayer;
 
   private Surface surface;
 
   private final TextureRegistry.SurfaceTextureEntry textureEntry;
 
-  private QueuingEventSink eventSink = new QueuingEventSink();
+  private final QueuingEventSink eventSink = new QueuingEventSink();
 
   private final EventChannel eventChannel;
 
@@ -62,6 +71,10 @@ final class VideoPlayer {
       TextureRegistry.SurfaceTextureEntry textureEntry,
       String dataSource,
       String formatHint,
+      long maxCacheSize,
+      long maxCacheFileSize,
+      boolean useCache,
+      SQLiteDatabase sqLiteDatabase,
       VideoPlayerOptions options) {
     this.eventChannel = eventChannel;
     this.textureEntry = textureEntry;
@@ -80,6 +93,11 @@ final class VideoPlayer {
               DefaultHttpDataSource.DEFAULT_CONNECT_TIMEOUT_MILLIS,
               DefaultHttpDataSource.DEFAULT_READ_TIMEOUT_MILLIS,
               true);
+      if (useCache && maxCacheSize > 0 && maxCacheFileSize > 0) {
+        dataSourceFactory =
+            new CacheDataSourceFactory(context, maxCacheSize, maxCacheFileSize, dataSourceFactory,
+                sqLiteDatabase);
+      }
     } else {
       dataSourceFactory = new DefaultDataSourceFactory(context, "ExoPlayer");
     }
@@ -282,6 +300,58 @@ final class VideoPlayer {
     }
     if (exoPlayer != null) {
       exoPlayer.release();
+    }
+  }
+
+  static class CacheDataSourceFactory implements DataSource.Factory {
+    private final Context context;
+    private final DefaultDataSourceFactory defaultDatasourceFactory;
+    private final DatabaseProvider databaseProvider;
+    private final long maxFileSize, maxCacheSize;
+    private static SimpleCache downloadCache;
+
+    CacheDataSourceFactory(
+        Context context,
+        long maxCacheSize,
+        long maxFileSize,
+        DataSource.Factory upstreamDataSource,
+        SQLiteDatabase sqLiteDatabase) {
+      super();
+      this.context = context;
+      this.maxCacheSize = maxCacheSize;
+      this.maxFileSize = maxFileSize;
+      DefaultBandwidthMeter bandwidthMeter = new DefaultBandwidthMeter.Builder(context).build();
+      defaultDatasourceFactory =
+          new DefaultDataSourceFactory(this.context, bandwidthMeter, upstreamDataSource);
+      databaseProvider = new DatabaseProvider() {
+        @Override
+        public SQLiteDatabase getWritableDatabase() {
+          return sqLiteDatabase;
+        }
+
+        @Override
+        public SQLiteDatabase getReadableDatabase() {
+          return sqLiteDatabase;
+        }
+      };
+    }
+
+    @Override
+    public DataSource createDataSource() {
+      LeastRecentlyUsedCacheEvictor evictor = new LeastRecentlyUsedCacheEvictor(maxCacheSize);
+
+      if (downloadCache == null) {
+        downloadCache =
+            new SimpleCache(new File(context.getCacheDir(), "video"), evictor, databaseProvider);
+      }
+
+      return new CacheDataSource(
+          downloadCache,
+          defaultDatasourceFactory.createDataSource(),
+          new FileDataSource(),
+          new CacheDataSink(downloadCache, maxFileSize),
+          CacheDataSource.FLAG_BLOCK_ON_CACHE | CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR,
+          null);
     }
   }
 }
