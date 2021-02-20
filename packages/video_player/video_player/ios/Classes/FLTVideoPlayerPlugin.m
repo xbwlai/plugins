@@ -6,7 +6,7 @@
 #import <AVFoundation/AVFoundation.h>
 #import <GLKit/GLKit.h>
 #import "messages.h"
-#import "VIMediaCache.h"
+#import "KTVHTTPCache/KTVHTTPCache.h"
 
 #if !__has_feature(objc_arc)
 #error Code Requires ARC.
@@ -52,7 +52,7 @@ int64_t FLTCMTimeToMillis(CMTime time) {
 - (void)pause;
 - (void)setIsLooping:(bool)isLooping;
 - (void)updatePlayingState;
-+ (VIResourceLoaderManager*)resourceLoaderManager;
+
 @end
 
 static void* timeRangeContext = &timeRangeContext;
@@ -172,20 +172,14 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
                frameUpdater:(FLTFrameUpdater*)frameUpdater
                 enableCache:(BOOL)enableCache {
   AVPlayerItem* item;
-  if (enableCache) {
-    item = [[FLTVideoPlayer resourceLoaderManager] playerItemWithURL:url];
-  } else {
-    item = [AVPlayerItem playerItemWithURL:url];
-  }
+  NSURL *cacheUrl;
+    if (enableCache) {
+        cacheUrl = [KTVHTTPCache proxyURLWithOriginalURL:url];
+    } else {
+        cacheUrl = url;
+    }
+  item = [AVPlayerItem playerItemWithURL:cacheUrl];
   return [self initWithPlayerItem:item frameUpdater:frameUpdater];
-}
-
-+ (VIResourceLoaderManager*)resourceLoaderManager {
-  static VIResourceLoaderManager* resourceLoaderManager = nil;
-  if (resourceLoaderManager == nil) {
-    resourceLoaderManager = [VIResourceLoaderManager new];
-  }
-  return resourceLoaderManager;
 }
 
 - (CGAffineTransform)fixTransform:(AVAssetTrack*)videoTrack {
@@ -478,6 +472,31 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
   FLTVideoPlayerPlugin* instance = [[FLTVideoPlayerPlugin alloc] initWithRegistrar:registrar];
   [registrar publish:instance];
   FLTVideoPlayerApiSetup(registrar.messenger, instance);
+    
+  static dispatch_once_t onceToken;
+  dispatch_once(&onceToken, ^{
+      [FLTVideoPlayerPlugin setupHTTPCache];
+  });
+}
+
++ (void)setupHTTPCache
+{
+    [KTVHTTPCache logSetConsoleLogEnable:NO];
+    NSError *error = nil;
+    [KTVHTTPCache proxyStart:&error];
+    if (error) {
+        NSLog(@"Proxy Start Failure, %@", error);
+    } else {
+        NSLog(@"Proxy Start Success");
+    }
+    [KTVHTTPCache encodeSetURLConverter:^NSURL *(NSURL *URL) {
+        NSLog(@"URL Filter reviced URL : %@", URL);
+        return URL;
+    }];
+    [KTVHTTPCache downloadSetUnacceptableContentTypeDisposer:^BOOL(NSURL *URL, NSString *contentType) {
+        NSLog(@"Unsupport Content-Type Filter reviced URL : %@, %@", URL, contentType);
+        return NO;
+    }];
 }
 
 - (instancetype)initWithRegistrar:(NSObject<FlutterPluginRegistrar>*)registrar {
@@ -518,7 +537,7 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
   return result;
 }
 
-- (void)initialize:(FlutterError* __autoreleasing*)error {
+- (void)initialize:(FLTInitializeMessage*)input error:(FlutterError *_Nullable *_Nonnull)error {
   // Allow audio playback when the Ring/Silent switch is set to silent
   [[AVAudioSession sharedInstance] setCategory:AVAudioSessionCategoryPlayback error:nil];
 
