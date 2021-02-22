@@ -238,6 +238,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   bool _isDisposed = false;
   static Completer<void> _pluginInitializingCompleter;
   Completer<void> _creatingCompleter;
+  Completer<void> _initializingCompleter;
   StreamSubscription<dynamic> _eventSubscription;
   _VideoAppLifeCycleObserver _lifeCycleObserver;
 
@@ -300,7 +301,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     }
     _textureId = await VideoPlayerPlatform.instance.create(dataSourceDescription);
     _creatingCompleter.complete(null);
-    final Completer<void> initializingCompleter = Completer<void>();
+    _initializingCompleter = Completer<void>();
 
     void eventListener(VideoEvent event) {
       if (_isDisposed) {
@@ -313,7 +314,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
             duration: event.duration,
             size: event.size,
           );
-          initializingCompleter.complete(null);
+          _initializingCompleter.complete(null);
           _applyLooping();
           _applyVolume();
           _applyPlayPause();
@@ -347,15 +348,15 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
       final PlatformException e = obj;
       value = VideoPlayerValue.erroneous(e.message);
       _timer?.cancel();
-      if (!initializingCompleter.isCompleted) {
-        initializingCompleter.completeError(obj);
+      if (!_initializingCompleter.isCompleted) {
+        _initializingCompleter.completeError(obj);
       }
     }
 
     _eventSubscription = VideoPlayerPlatform.instance
         .videoEventsFor(_textureId)
         .listen(eventListener, onError: errorListener);
-    return initializingCompleter.future;
+    return _initializingCompleter.future;
   }
 
   Future<void> _ensureVideoPluginInitialized() async {
@@ -380,6 +381,9 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
         _timer?.cancel();
         await _eventSubscription?.cancel();
         await VideoPlayerPlatform.instance.dispose(_textureId);
+        if (!_initializingCompleter.isCompleted) {
+          _initializingCompleter.completeError(Exception('Video player is disposed!'));
+        }
       }
       _lifeCycleObserver.dispose();
     }
