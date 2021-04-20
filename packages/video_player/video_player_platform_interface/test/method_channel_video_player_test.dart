@@ -13,6 +13,7 @@ import 'package:video_player_platform_interface/video_player_platform_interface.
 
 class _ApiLogger implements TestHostVideoPlayerApi {
   final List<String> log = [];
+  InitializeMessage? initializeMessage;
   TextureMessage? textureMessage;
   CreateMessage? createMessage;
   PositionMessage? positionMessage;
@@ -35,8 +36,9 @@ class _ApiLogger implements TestHostVideoPlayerApi {
   }
 
   @override
-  void initialize() {
+  void initialize(InitializeMessage arg) {
     log.add('init');
+    initializeMessage = arg;
   }
 
   @override
@@ -109,11 +111,10 @@ void main() {
     });
 
     test('init', () async {
-      await player.init();
-      expect(
-        log.log.last,
-        'init',
-      );
+      await player.init(1, 1);
+      expect(log.log.last, 'init');
+      expect(log.initializeMessage?.maxCacheSize, 1);
+      expect(log.initializeMessage?.maxCacheFileSize, 1);
     });
 
     test('dispose', () async {

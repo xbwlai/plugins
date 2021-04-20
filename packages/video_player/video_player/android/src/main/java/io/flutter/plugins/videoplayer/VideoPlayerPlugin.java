@@ -7,6 +7,7 @@ package io.flutter.plugins.videoplayer;
 import android.content.Context;
 import android.os.Build;
 import android.util.LongSparseArray;
+import androidx.annotation.NonNull;
 import io.flutter.FlutterInjector;
 import io.flutter.Log;
 import io.flutter.embedding.engine.plugins.FlutterPlugin;
@@ -23,6 +24,7 @@ import io.flutter.plugins.videoplayer.Messages.VolumeMessage;
 import io.flutter.view.TextureRegistry;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
+import java.util.HashMap;
 import java.util.Map;
 import javax.net.ssl.HttpsURLConnection;
 
@@ -31,10 +33,14 @@ public class VideoPlayerPlugin implements FlutterPlugin, VideoPlayerApi {
   private static final String TAG = "VideoPlayerPlugin";
   private final LongSparseArray<VideoPlayer> videoPlayers = new LongSparseArray<>();
   private FlutterState flutterState;
-  private VideoPlayerOptions options = new VideoPlayerOptions();
+  private final VideoPlayerOptions options = new VideoPlayerOptions();
+
+  private long maxCacheSize;
+  private long maxCacheFileSize;
 
   /** Register this with the v2 embedding for the plugin to respond to lifecycle callbacks. */
-  public VideoPlayerPlugin() {}
+  public VideoPlayerPlugin() {
+  }
 
   @SuppressWarnings("deprecation")
   private VideoPlayerPlugin(io.flutter.plugin.common.PluginRegistry.Registrar registrar) {
@@ -87,13 +93,13 @@ public class VideoPlayerPlugin implements FlutterPlugin, VideoPlayerApi {
   }
 
   @Override
-  public void onDetachedFromEngine(FlutterPluginBinding binding) {
+  public void onDetachedFromEngine(@NonNull FlutterPluginBinding binding) {
     if (flutterState == null) {
       Log.wtf(TAG, "Detached from the engine before registering to it.");
     }
     flutterState.stopListening(binding.getBinaryMessenger());
     flutterState = null;
-    initialize();
+    disposeAllPlayers();
   }
 
   private void disposeAllPlayers() {
@@ -112,7 +118,10 @@ public class VideoPlayerPlugin implements FlutterPlugin, VideoPlayerApi {
     disposeAllPlayers();
   }
 
-  public void initialize() {
+  @Override
+  public void initialize(Messages.InitializeMessage arg) {
+    maxCacheSize = arg.getMaxCacheSize();
+    maxCacheFileSize = arg.getMaxCacheFileSize();
     disposeAllPlayers();
   }
 
@@ -140,10 +149,16 @@ public class VideoPlayerPlugin implements FlutterPlugin, VideoPlayerApi {
               "asset:///" + assetLookupKey,
               null,
               null,
+              maxCacheSize,
+              maxCacheFileSize,
+              false,
               options);
     } else {
-      @SuppressWarnings("unchecked")
-      Map<String, String> httpHeaders = arg.getHttpHeaders();
+      Map<String, String> httpHeaders = new HashMap<>();
+      for (Object key : arg.getHttpHeaders().keySet()) {
+        httpHeaders.put(key.toString(), arg.getHttpHeaders().get(key).toString());
+      }
+
       player =
           new VideoPlayer(
               flutterState.applicationContext,
@@ -152,6 +167,9 @@ public class VideoPlayerPlugin implements FlutterPlugin, VideoPlayerApi {
               arg.getUri(),
               arg.getFormatHint(),
               httpHeaders,
+              maxCacheSize,
+              maxCacheFileSize,
+              arg.getUseCache(),
               options);
     }
     videoPlayers.put(handle.id(), player);

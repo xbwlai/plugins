@@ -6,6 +6,7 @@
 #import <AVFoundation/AVFoundation.h>
 #import <GLKit/GLKit.h>
 #import "messages.h"
+#import "KTVHTTPCache/KTVHTTPCache.h"
 
 #if !__has_feature(objc_arc)
 #error Code Requires ARC.
@@ -48,7 +49,8 @@ int64_t FLTCMTimeToMillis(CMTime time) {
 @property(nonatomic, readonly) bool isInitialized;
 - (instancetype)initWithURL:(NSURL*)url
                frameUpdater:(FLTFrameUpdater*)frameUpdater
-                httpHeaders:(NSDictionary<NSString*, NSString*>*)headers;
+                httpHeaders:(NSDictionary<NSString*, NSString*>*)headers
+                enableCache:(BOOL)enableCache;
 - (void)play;
 - (void)pause;
 - (void)setIsLooping:(bool)isLooping;
@@ -64,7 +66,7 @@ static void* playbackBufferFullContext = &playbackBufferFullContext;
 @implementation FLTVideoPlayer
 - (instancetype)initWithAsset:(NSString*)asset frameUpdater:(FLTFrameUpdater*)frameUpdater {
   NSString* path = [[NSBundle mainBundle] pathForResource:asset ofType:nil];
-  return [self initWithURL:[NSURL fileURLWithPath:path] frameUpdater:frameUpdater httpHeaders:nil];
+  return [self initWithURL:[NSURL fileURLWithPath:path] frameUpdater:frameUpdater httpHeaders:nil enableCache:NO];
 }
 
 - (void)addObservers:(AVPlayerItem*)item {
@@ -166,13 +168,20 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
 
 - (instancetype)initWithURL:(NSURL*)url
                frameUpdater:(FLTFrameUpdater*)frameUpdater
-                httpHeaders:(NSDictionary<NSString*, NSString*>*)headers {
-  NSDictionary<NSString*, id>* options = nil;
-  if (headers != nil && [headers count] != 0) {
-    options = @{@"AVURLAssetHTTPHeaderFieldsKey" : headers};
+                httpHeaders:(NSDictionary<NSString*, NSString*>*)headers
+                enableCache:(BOOL)enableCache {
+  AVPlayerItem* item;
+  if (enableCache) {
+    NSURL* cacheUrl = [KTVHTTPCache proxyURLWithOriginalURL:url];
+    item = [AVPlayerItem playerItemWithURL:cacheUrl];
+  } else {
+    NSDictionary<NSString*, id>* options = nil;
+    if (headers != nil && [headers count] != 0) {
+      options = @{@"AVURLAssetHTTPHeaderFieldsKey" : headers};
+    }
+    AVURLAsset* urlAsset = [AVURLAsset URLAssetWithURL:url options:options];
+    item = [AVPlayerItem playerItemWithAsset:urlAsset];
   }
-  AVURLAsset* urlAsset = [AVURLAsset URLAssetWithURL:url options:options];
-  AVPlayerItem* item = [AVPlayerItem playerItemWithAsset:urlAsset];
   return [self initWithPlayerItem:item frameUpdater:frameUpdater];
 }
 
@@ -466,6 +475,31 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
   FLTVideoPlayerPlugin* instance = [[FLTVideoPlayerPlugin alloc] initWithRegistrar:registrar];
   [registrar publish:instance];
   FLTVideoPlayerApiSetup(registrar.messenger, instance);
+  
+  static dispatch_once_t onceToken;
+  dispatch_once(&onceToken, ^{
+    [FLTVideoPlayerPlugin setupHTTPCache];
+  });
+}
+
++ (void)setupHTTPCache
+{
+  [KTVHTTPCache logSetConsoleLogEnable:NO];
+  NSError *error = nil;
+  [KTVHTTPCache proxyStart:&error];
+  if (error) {
+    NSLog(@"Proxy Start Failure, %@", error);
+  } else {
+    NSLog(@"Proxy Start Success");
+  }
+  [KTVHTTPCache encodeSetURLConverter:^NSURL *(NSURL *URL) {
+    NSLog(@"URL Filter reviced URL : %@", URL);
+    return URL;
+  }];
+  [KTVHTTPCache downloadSetUnacceptableContentTypeDisposer:^BOOL(NSURL *URL, NSString *contentType) {
+    NSLog(@"Unsupport Content-Type Filter reviced URL : %@, %@", URL, contentType);
+    return NO;
+  }];
 }
 
 - (instancetype)initWithRegistrar:(NSObject<FlutterPluginRegistrar>*)registrar {
@@ -506,7 +540,7 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
   return result;
 }
 
-- (void)initialize:(FlutterError* __autoreleasing*)error {
+- (void)initialize:(FLTInitializeMessage*)input error:(FlutterError *_Nullable *_Nonnull)error {
   // Allow audio playback when the Ring/Silent switch is set to silent
   [[AVAudioSession sharedInstance] setCategory:AVAudioSessionCategoryPlayback error:nil];
 
@@ -515,6 +549,10 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
     [_players[textureId] dispose];
   }
   [_players removeAllObjects];
+  
+  if (input.maxCacheSize) {
+    [KTVHTTPCache cacheSetMaxCacheLength:input.maxCacheSize.longLongValue];
+  }
 }
 
 - (FLTTextureMessage*)create:(FLTCreateMessage*)input error:(FlutterError**)error {
@@ -532,7 +570,8 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
   } else if (input.uri) {
     player = [[FLTVideoPlayer alloc] initWithURL:[NSURL URLWithString:input.uri]
                                     frameUpdater:frameUpdater
-                                     httpHeaders:input.httpHeaders];
+                                     httpHeaders:input.httpHeaders
+                                     enableCache:input.useCache];
     return [self onPlayerSetup:player frameUpdater:frameUpdater];
   } else {
     *error = [FlutterError errorWithCode:@"video_player" message:@"not implemented" details:nil];
