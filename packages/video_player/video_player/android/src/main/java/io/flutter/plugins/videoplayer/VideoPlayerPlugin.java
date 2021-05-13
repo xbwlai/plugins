@@ -155,8 +155,10 @@ public class VideoPlayerPlugin implements FlutterPlugin, VideoPlayerApi {
               options);
     } else {
       Map<String, String> httpHeaders = new HashMap<>();
-      for (Object key : arg.getHttpHeaders().keySet()) {
-        httpHeaders.put(key.toString(), arg.getHttpHeaders().get(key).toString());
+      if (arg.getHttpHeaders() != null) {
+        for (Object key : arg.getHttpHeaders().keySet()) {
+          httpHeaders.put(key.toString(), arg.getHttpHeaders().get(key).toString());
+        }
       }
 
       player =
