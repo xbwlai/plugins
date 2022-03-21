@@ -494,7 +494,9 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
   }
   [KTVHTTPCache encodeSetURLConverter:^NSURL *(NSURL *URL) {
     NSLog(@"URL Filter reviced URL : %@", URL);
-    return URL;
+
+    NSString *newPath = [NSString stringWithFormat:@"%@://%@\%@", URL.scheme, URL.host, URL.path];
+    return [NSURL URLWithString:newPath];
   }];
   [KTVHTTPCache downloadSetUnacceptableContentTypeDisposer:^BOOL(NSURL *URL, NSString *contentType) {
     NSLog(@"Unsupport Content-Type Filter reviced URL : %@, %@", URL, contentType);
