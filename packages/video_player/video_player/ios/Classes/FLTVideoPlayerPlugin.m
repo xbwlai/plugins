@@ -173,6 +173,9 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
   AVPlayerItem* item;
   if (enableCache) {
     NSURL* cacheUrl = [KTVHTTPCache proxyURLWithOriginalURL:url];
+    if (headers != nil && [headers count] != 0) {
+      [KTVHTTPCache downloadSetAdditionalHeaders:headers];
+    }
     item = [AVPlayerItem playerItemWithURL:cacheUrl];
   } else {
     NSDictionary<NSString*, id>* options = nil;
