@@ -71,6 +71,9 @@ class FakeController extends ValueNotifier<VideoPlayerValue>
 
   @override
   bool? get useCache => null;
+
+  @override
+  String? get cacheKey => null;
 }
 
 Future<ClosedCaptionFile> _loadClosedCaption() async =>

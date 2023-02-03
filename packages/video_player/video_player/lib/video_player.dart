@@ -189,6 +189,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
         formatHint = null,
         httpHeaders = const {},
         useCache = false,
+        cacheKey = null,
         super(VideoPlayerValue(duration: Duration.zero));
 
   /// Constructs a [VideoPlayerController] playing a video from obtained from
@@ -207,6 +208,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     this.videoPlayerOptions,
     this.httpHeaders = const {},
     bool useCache = false,
+    this.cacheKey,
   })  : dataSourceType = DataSourceType.network,
         package = null,
         useCache = useCache,
@@ -224,6 +226,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
         formatHint = null,
         httpHeaders = const {},
         useCache = false,
+        cacheKey = null,
         super(VideoPlayerValue(duration: Duration.zero));
 
   /// The maximum cache size to keep on disk in bytes.
@@ -254,6 +257,9 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
 
   /// Use cache for this data source or not. Used only for network data source.
   final bool? useCache;
+
+  /// The cache key for this data source. Used only for network data source.
+  final String? cacheKey;
 
   /// Only set for [asset] videos. The package that the asset was loaded from.
   final String? package;
@@ -329,6 +335,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
           formatHint: formatHint,
           httpHeaders: httpHeaders,
           useCache: useCache,
+          cacheKey: cacheKey,
         );
         break;
       case DataSourceType.file:
