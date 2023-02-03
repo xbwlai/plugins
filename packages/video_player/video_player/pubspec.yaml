@@ -21,7 +21,7 @@ dependencies:
 #    path: ../video_player_platform_interface
     git:
       url: git@github.com:suli1/plugins.git
-      ref: video_player-v2.1.1_caching
+      ref: video_player_platform_interface-v2.1.1_caching+4
       path: packages/video_player/video_player_platform_interface
 
 
