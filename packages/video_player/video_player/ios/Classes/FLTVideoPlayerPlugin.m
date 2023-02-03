@@ -478,7 +478,7 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
   FLTVideoPlayerPlugin* instance = [[FLTVideoPlayerPlugin alloc] initWithRegistrar:registrar];
   [registrar publish:instance];
   FLTVideoPlayerApiSetup(registrar.messenger, instance);
-  
+
   static dispatch_once_t onceToken;
   dispatch_once(&onceToken, ^{
     [FLTVideoPlayerPlugin setupHTTPCache];
@@ -571,6 +571,11 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
     player = [[FLTVideoPlayer alloc] initWithAsset:assetPath frameUpdater:frameUpdater];
     return [self onPlayerSetup:player frameUpdater:frameUpdater];
   } else if (input.uri) {
+    if(input.cacheKey != nil && (NSNull *)input.cacheKey != [NSNull null]) {
+      [KTVHTTPCache encodeSetURLConverter:^NSURL *(NSURL *URL) {
+        return [NSURL URLWithString:input.cacheKey];
+      }];
+    }
     player = [[FLTVideoPlayer alloc] initWithURL:[NSURL URLWithString:input.uri]
                                     frameUpdater:frameUpdater
                                      httpHeaders:input.httpHeaders

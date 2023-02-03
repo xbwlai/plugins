@@ -152,6 +152,7 @@ public class VideoPlayerPlugin implements FlutterPlugin, VideoPlayerApi {
               maxCacheSize,
               maxCacheFileSize,
               false,
+              null,
               options);
     } else {
       Map<String, String> httpHeaders = new HashMap<>();
@@ -172,6 +173,7 @@ public class VideoPlayerPlugin implements FlutterPlugin, VideoPlayerApi {
               maxCacheSize,
               maxCacheFileSize,
               arg.getUseCache(),
+              arg.getCacheKey(),
               options);
     }
     videoPlayers.put(handle.id(), player);

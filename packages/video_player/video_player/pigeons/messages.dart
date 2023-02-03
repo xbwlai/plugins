@@ -42,6 +42,7 @@ class CreateMessage {
   String? formatHint;
   Map<String?, String?>? httpHeaders;
   bool? useCache;
+  String? cacheKey;
 }
 
 class MixWithOthersMessage {

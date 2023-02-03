@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 import 'dart:async';
-import 'dart:ui';
 
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
@@ -46,6 +45,7 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
         break;
     }
     message.useCache = dataSource.useCache;
+    message.cacheKey = dataSource.cacheKey;
 
     TextureMessage response = await _api.create(message);
     return response.textureId;

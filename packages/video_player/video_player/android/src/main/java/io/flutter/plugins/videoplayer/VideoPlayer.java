@@ -7,6 +7,7 @@ package io.flutter.plugins.videoplayer;
 import android.content.Context;
 import android.net.Uri;
 import android.view.Surface;
+import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.ExoPlaybackException;
 import com.google.android.exoplayer2.Format;
@@ -32,9 +33,11 @@ import com.google.android.exoplayer2.upstream.DefaultHttpDataSourceFactory;
 import com.google.android.exoplayer2.upstream.FileDataSource;
 import com.google.android.exoplayer2.upstream.cache.CacheDataSink;
 import com.google.android.exoplayer2.upstream.cache.CacheDataSource;
+import com.google.android.exoplayer2.upstream.cache.CacheKeyFactory;
 import com.google.android.exoplayer2.upstream.cache.LeastRecentlyUsedCacheEvictor;
 import com.google.android.exoplayer2.upstream.cache.SimpleCache;
 import com.google.android.exoplayer2.util.Util;
+import io.flutter.Log;
 import io.flutter.plugin.common.EventChannel;
 import io.flutter.view.TextureRegistry;
 import java.io.File;
@@ -77,6 +80,7 @@ final class VideoPlayer {
       long maxCacheSize,
       long maxCacheFileSize,
       boolean useCache,
+      @Nullable String cacheKey,
       VideoPlayerOptions options) {
     this.eventChannel = eventChannel;
     this.textureEntry = textureEntry;
@@ -101,7 +105,8 @@ final class VideoPlayer {
       dataSourceFactory = httpDataSourceFactory;
       if (useCache && maxCacheSize > 0 && maxCacheFileSize > 0) {
         dataSourceFactory =
-            new CacheDataSourceFactory(context, maxCacheSize, maxCacheFileSize, dataSourceFactory);
+            new CacheDataSourceFactory(context, maxCacheSize, maxCacheFileSize, cacheKey,
+                dataSourceFactory);
       }
     } else {
       dataSourceFactory = new DefaultDataSourceFactory(context, "ExoPlayer");
@@ -324,17 +329,21 @@ final class VideoPlayer {
     private final DefaultDataSourceFactory defaultDatasourceFactory;
     private final DatabaseProvider databaseProvider;
     private final long maxFileSize, maxCacheSize;
+
+    private final String cacheKey;
     private static SimpleCache downloadCache;
 
     CacheDataSourceFactory(
         Context context,
         long maxCacheSize,
         long maxFileSize,
+        String cacheKey,
         DataSource.Factory upstreamDataSource) {
       super();
       this.context = context;
       this.maxCacheSize = maxCacheSize;
       this.maxFileSize = maxFileSize;
+      this.cacheKey = cacheKey;
       DefaultBandwidthMeter bandwidthMeter = new DefaultBandwidthMeter.Builder(context).build();
       defaultDatasourceFactory =
           new DefaultDataSourceFactory(this.context, bandwidthMeter, upstreamDataSource);
@@ -350,6 +359,10 @@ final class VideoPlayer {
             new SimpleCache(new File(context.getCacheDir(), "video"), evictor, databaseProvider,
                 null, false, true);
       }
+      CacheKeyFactory cacheKeyFactory = null;
+      if (cacheKey != null) {
+        cacheKeyFactory = dataSpec -> cacheKey;
+      }
 
       return new CacheDataSource(
           downloadCache,
@@ -357,7 +370,8 @@ final class VideoPlayer {
           new FileDataSource(),
           new CacheDataSink(downloadCache, maxFileSize),
           CacheDataSource.FLAG_BLOCK_ON_CACHE | CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR,
-          null);
+          null,
+          cacheKeyFactory);
     }
   }
 }

@@ -3,11 +3,9 @@
 // found in the LICENSE file.
 
 import 'dart:async';
-import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
-import 'package:meta/meta.dart' show visibleForTesting;
 
 import 'method_channel_video_player.dart';
 
@@ -155,6 +153,7 @@ class DataSource {
     this.package,
     this.httpHeaders = const {},
     this.useCache = false,
+    this.cacheKey,
   });
 
   /// The way in which the video was originally loaded.
@@ -187,6 +186,9 @@ class DataSource {
 
   /// Use cache for this data source or not. Used only for network data source.
   final bool? useCache;
+
+  /// The cache key for this data source. Used only for network data source.
+  final String? cacheKey;
 }
 
 /// The way in which the video was originally loaded.
