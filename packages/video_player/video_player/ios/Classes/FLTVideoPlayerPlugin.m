@@ -575,6 +575,10 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
       [KTVHTTPCache encodeSetURLConverter:^NSURL *(NSURL *URL) {
         return [NSURL URLWithString:input.cacheKey];
       }];
+    } else {
+        [KTVHTTPCache encodeSetURLConverter:^NSURL *(NSURL *URL) {
+          return URL;
+        }];
     }
     player = [[FLTVideoPlayer alloc] initWithURL:[NSURL URLWithString:input.uri]
                                     frameUpdater:frameUpdater
