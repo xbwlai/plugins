@@ -497,7 +497,10 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
   }
   [KTVHTTPCache encodeSetURLConverter:^NSURL *(NSURL *URL) {
     NSLog(@"URL Filter reviced URL : %@", URL);
-    return URL;
+    // 视频链接带有时效参数，但视频文件是同一个，此处缓存时使用去除参数的链接作为 key。
+    // flutter 侧传入 useCache 和 cacheKey 参数，其中 cacheKey 是由视频链接去除参数后 MD5 生成。此处规则保持一致。
+    // 如需修改此处规则，注意与 flutter 侧保持一致。
+    return [NSURL URLWithString:[NSString stringWithFormat:@"%@://%@%@", [URL scheme], [URL host], [URL path]]];
   }];
   [KTVHTTPCache downloadSetUnacceptableContentTypeDisposer:^BOOL(NSURL *URL, NSString *contentType) {
     NSLog(@"Unsupport Content-Type Filter reviced URL : %@, %@", URL, contentType);
@@ -571,15 +574,6 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
     player = [[FLTVideoPlayer alloc] initWithAsset:assetPath frameUpdater:frameUpdater];
     return [self onPlayerSetup:player frameUpdater:frameUpdater];
   } else if (input.uri) {
-    if(input.cacheKey != nil && (NSNull *)input.cacheKey != [NSNull null]) {
-      [KTVHTTPCache encodeSetURLConverter:^NSURL *(NSURL *URL) {
-        return [NSURL URLWithString:input.cacheKey];
-      }];
-    } else {
-        [KTVHTTPCache encodeSetURLConverter:^NSURL *(NSURL *URL) {
-          return URL;
-        }];
-    }
     player = [[FLTVideoPlayer alloc] initWithURL:[NSURL URLWithString:input.uri]
                                     frameUpdater:frameUpdater
                                      httpHeaders:input.httpHeaders
